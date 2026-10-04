@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>G1 通用展开图折叠器</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: "Microsoft YaHei", sans-serif; background: #1a1a2e; color: white; }
+
+  #info {
+    position: absolute; top: 20px; left: 20px;
+    background: rgba(0,0,0,0.78);
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 14px; line-height: 1.9; min-width: 260px;
+  }
+  #info h3 { margin: 0 0 8px; color: #66ccff; font-size: 16px; }
+  .row-info { display: flex; justify-content: space-between; gap: 16px; }
+  .val { color: #88ffbb; font-weight: bold; }
+  .big { color: #ffcc00; font-weight: bold; font-size: 16px; }
+
+  #hint {
+    position: absolute; top: 20px; right: 20px;
+    background: rgba(0,0,0,0.7); padding: 12px 18px; border-radius: 8px;
+    font-size: 13px; line-height: 1.75; max-width: 230px; color: #aaccff;
+  }
+
+  #controls {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.9); padding: 18px 26px; border-radius: 12px;
+    display: flex; flex-direction: column; gap: 12px; min-width: 700px;
+  }
+  .row {
+    display: flex; gap: 12px; align-items: center; justify-content: center;
+    flex-wrap: wrap;
+  }
+  .row label { font-size: 14px; color: #ccc; white-space: nowrap; }
+  .row select, .row input[type=number] {
+    padding: 6px 10px; background: #1a1a2e; color: #ffcc00;
+    border: 1px solid #4488ff; border-radius: 6px;
+    font-size: 15px; font-weight: bold; font-family: inherit;
+  }
+  .row select { color: #88ccff; min-width: 100px; }
+  .row input[type=number] { width: 74px; text-align: center; }
+  .row input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .row input:focus, .row select:focus {
+    outline: none; border-color: #66ccff;
+    box-shadow: 0 0 6px rgba(102,204,255,0.5);
+  }
+
+  #kRow {
+    display: flex; align-items: center; gap: 12px;
+    padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  #kRow label { min-width: 80px; }
+  #kSlider { flex: 1; height: 6px; cursor: pointer; }
+  #kValue { color: #ffcc00; font-weight: bold; font-size: 16px; min-width: 55px; text-align: right; }
+
+  #btnRow button {
+    padding: 8px 22px; font-size: 14px;
+    border: none; border-radius: 6px; cursor: pointer;
+    background: #4488ff; color: white; font-weight: bold; font-family: inherit;
+  }
+  #btnRow button:hover { background: #3366cc; }
+  #btnUnfold { background: #22aa66; } #btnUnfold:hover { background: #118855; }
+  #btnFold { background: #cc7744; } #btnFold:hover { background: #aa5522; }
+
+  #warning { color: #ff8866; font-size: 13px; text-align: center; height: 16px; }
+</style>
+</head>
+<body>
+
+<div id="info">
+  <h3>G1 通用展开图折叠器</h3>
+  <div class="row-info"><span>图形</span><span class="big" id="infoShape">圆柱</span></div>
+  <div class="row-info"><span>下底半径 R</span><span class="val" id="infoR">1.00</span></div>
+  <div class="row-info"><span>上底半径 r</span><span class="val" id="infoRtop">1.00</span></div>
+  <div class="row-info"><span>高 h</span><span class="val" id="infoH">2.00</span></div>
+  <div class="row-info"><span>母线长 l</span><span class="val" id="infoL">2.00</span></div>
+  <div class="row-info"><span>侧面积 S</span><span class="val" id="infoS">12.57</span></div>
+  <div class="row-info"><span>展开</span><span class="big" id="infoK">0%</span></div>
+</div>
+
+<div id="hint">
+  💡 玩法<br>
+  1. 选图形<br>
+  2. 输入 R、r、h<br>
+  3. 拖展开滑块<br>
+  4. 鼠标拖动看视角
+</div>
+
+<div id="controls">
+  <div class="row">
+    <label>图形</label>
+    <select id="shapeSelect">
+      <option value="cylinder">圆柱</option>
+      <option value="cone">圆锥</option>
+      <option value="frustum">圆台</option>
+      <option value="prism">棱柱</option>
+      <option value="pyramid">棱锥</option>
+      <option value="prismoid">棱台</option>
+    </select>
+    <label>边数 n</label>
+    <input type="number" id="sidesInput" min="3" max="12" value="4" step="1" disabled>
+  </div>
+  <div class="row">
+    <label>下底半径 R</label>
+    <input type="number" id="inputR" min="0.2" max="2" step="0.05" value="1">
+    <label>上底半径 r</label>
+    <input type="number" id="inputRtop" min="0" max="2" step="0.05" value="1" disabled>
+    <label>高 h</label>
+    <input type="number" id="inputH" min="0.3" max="4" step="0.05" value="2">
+  </div>
+  <div id="kRow">
+    <label>展开程度</label>
+    <input type="range" id="kSlider" min="0" max="100" value="0" step="1">
+    <span id="kValue">0%</span>
+  </div>
+  <div class="row" id="btnRow">
+    <button id="btnUnfold">自动展开</button>
+    <button id="btnFold">自动卷起</button>
+    <button id="btnReset">重置视角</button>
+  </div>
+  <div id="warning"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ========== 全局状态 ========== */
+let shapeType = 'cylinder';
+let N_SIDES = 0;
+let R = 1, Rtop = 1, H = 2;
+let K = 0, targetK = 0;
+
+const Y_SEG = 8;
+
+/* ========== 场景 ========== */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(6, 6, 9);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 0.8, 0);
+
+/* ========== 光照 ========== */
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const dl1 = new THREE.DirectionalLight(0xffffff, 1.2);
+dl1.position.set(6, 10, 7); scene.add(dl1);
+const dl2 = new THREE.DirectionalLight(0x88aaff, 0.5);
+dl2.position.set(-6, 4, -7); scene.add(dl2);
+
+/* ========== 地面网格 ========== */
+const grid = new THREE.GridHelper(20, 40, 0x444466, 0x2a2a44);
+grid.position.y = -0.05;
+scene.add(grid);
+
+/* ========== 材质 ========== */
+const materialSmooth = new THREE.MeshStandardMaterial({
+  color: 0x66ccff, side: THREE.DoubleSide,
+  roughness: 0.5, metalness: 0.1,
+  emissive: 0x113355, emissiveIntensity: 0.25,
+  transparent: true, opacity: 0.9,
+  flatShading: false,
+});
+const materialFlat = new THREE.MeshStandardMaterial({
+  color: 0x66ccff, side: THREE.DoubleSide,
+  roughness: 0.5, metalness: 0.1,
+  emissive: 0x113355, emissiveIntensity: 0.25,
+  transparent: true, opacity: 0.9,
+  flatShading: true,
+});
+
+/* ========== 侧面 mesh 和上下底轮廓 line ========== */
+let sideMesh = null;
+let topLine = null, botLine = null;
+let topGeom = null, botGeom = null;
+
+const topMat = new THREE.LineBasicMaterial({ color: 0xffcc44 });
+const botMat = new THREE.LineBasicMaterial({ color: 0xff8866 });
+
+/* ========== 采样点数 ========== */
+function getSegments() {
+  return N_SIDES > 0 ? N_SIDES : 144;
+}
+
+/* ========== 底面周长 ========== */
+function getPerimeter() {
+  if (N_SIDES > 0) {
+    return N_SIDES * 2 * R * Math.sin(Math.PI / N_SIDES);
+  }
+  return 2 * Math.PI * R;
+}
+
+/* ========== 位置插值 ========== */
+function interpPos(i, v, t) {
+  const segments = getSegments();
+  const perimeter = getPerimeter();
+
+  /* 立体位置 */
+  const angle = (i / segments) * 2 * Math.PI;
+  const rho = R - v * (R - Rtop);
+  const sx = rho * Math.sin(angle);
+  const sy = v * H;
+  const sz = rho * Math.cos(angle);
+
+  /* 展开位置 */
+  let d;
+  if (N_SIDES > 0) {
+    const side = 2 * R * Math.sin(Math.PI / N_SIDES);
+    d = i * side - perimeter / 2;
+  } else {
+    d = (i / segments) * perimeter - perimeter / 2;
+  }
+
+  const Delta = R - Rtop;
+  let fx, fy, fz;
+
+  if (Math.abs(Delta) < 0.001) {
+    /* 圆柱式：矩形铺在 y=0 平面，宽沿 x，深沿 z */
+    fx = d;
+    fy = 0;
+    fz = (v - 0.5) * H;
+  } else {
+    /* 扇形式：展开成扇环，落在 y=0 平面 */
+    const Y_apex = R * H / Delta;
+    const L1 = Math.sqrt(R * R + Y_apex * Y_apex);
+    const L2 = Math.sqrt(Rtop * Rtop + (Y_apex - H) * (Y_apex - H));
+    const l = L1 - L2;
+    const alpha_total = perimeter / L1;
+
+    const theta = (d / perimeter) * alpha_total;
+    const rr = L1 - v * l;
+
+    fx = rr * Math.sin(theta);
+    fy = 0;
+    fz = rr * Math.cos(theta) - L1 * 0.5;
+  }
+
+  return {
+    x: sx * (1 - t) + fx * t,
+    y: sy * (1 - t) + fy * t,
+    z: sz * (1 - t) + fz * t,
+  };
+}
+
+/* ========== 重建几何体（改变 n 时） ========== */
+function rebuildGeometry() {
+  const segments = getSegments();
+
+  /* 侧面 */
+  if (sideMesh) {
+    scene.remove(sideMesh);
+    sideMesh.geometry.dispose();
+  }
+  const vCount = (segments + 1) * (Y_SEG + 1);
+  const sideGeom = new THREE.BufferGeometry();
+  sideGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vCount * 3), 3));
+
+  const indices = [];
+  for (let j = 0; j < Y_SEG; j++) {
+    for (let i = 0; i < segments; i++) {
+      const a = j * (segments + 1) + i;
+      const b = a + 1;
+      const c = a + (segments + 1);
+      const d = c + 1;
+      indices.push(a, b, d, a, d, c);
+    }
+  }
+  sideGeom.setIndex(indices);
+
+  const mat = N_SIDES > 0 ? materialFlat : materialSmooth;
+  sideMesh = new THREE.Mesh(sideGeom, mat);
+  sideMesh.frustumCulled = false;
+  scene.add(sideMesh);
+
+  /* 上下底轮廓线 */
+  if (topLine) scene.remove(topLine);
+  if (botLine) scene.remove(botLine);
+
+  topGeom = new THREE.BufferGeometry();
+  topGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array((segments + 1) * 3), 3));
+  topLine = new THREE.Line(topGeom, topMat);
+  topLine.frustumCulled = false;
+  scene.add(topLine);
+
+  botGeom = new THREE.BufferGeometry();
+  botGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array((segments + 1) * 3), 3));
+  botLine = new THREE.Line(botGeom, botMat);
+  botLine.frustumCulled = false;
+  scene.add(botLine);
+}
+
+/* ========== 更新几何体顶点 ========== */
+function updateGeometry() {
+  const segments = getSegments();
+  const sidePos = sideMesh.geometry.attributes.position.array;
+  let idx = 0;
+  for (let j = 0; j <= Y_SEG; j++) {
+    const v = j / Y_SEG;
+    for (let i = 0; i <= segments; i++) {
+      const p = interpPos(i, v, K);
+      sidePos[idx++] = p.x;
+      sidePos[idx++] = p.y;
+      sidePos[idx++] = p.z;
+    }
+  }
+  sideMesh.geometry.attributes.position.needsUpdate = true;
+  sideMesh.geometry.computeVertexNormals();
+
+  /* 上下底 */
+  const topPos = topGeom.attributes.position.array;
+  const botPos = botGeom.attributes.position.array;
+  for (let i = 0; i <= segments; i++) {
+    const pTop = interpPos(i, 1, K);
+    topPos[i*3]   = pTop.x;
+    topPos[i*3+1] = pTop.y;
+    topPos[i*3+2] = pTop.z;
+
+    const pBot = interpPos(i, 0, K);
+    botPos[i*3]   = pBot.x;
+    botPos[i*3+1] = pBot.y;
+    botPos[i*3+2] = pBot.z;
+  }
+  topGeom.attributes.position.needsUpdate = true;
+  botGeom.attributes.position.needsUpdate = true;
+  topLine.visible = Rtop > 0.02;
+
+  updateInfo();
+}
+
+/* ========== 信息面板 ========== */
+function updateInfo() {
+  const Delta = R - Rtop;
+  const l = Math.sqrt(Delta * Delta + H * H);
+  const S = Math.PI * (R + Rtop) * l;
+
+  document.getElementById('infoR').textContent = R.toFixed(2);
+  document.getElementById('infoRtop').textContent = Rtop.toFixed(2);
+  document.getElementById('infoH').textContent = H.toFixed(2);
+  document.getElementById('infoL').textContent = l.toFixed(2);
+  document.getElementById('infoS').textContent = S.toFixed(2);
+
+  let shapeName;
+  switch (shapeType) {
+    case 'cylinder': shapeName = '圆柱'; break;
+    case 'cone': shapeName = '圆锥'; break;
+    case 'frustum': shapeName = '圆台'; break;
+    case 'prism': shapeName = (N_SIDES) + '棱柱'; break;
+    case 'pyramid': shapeName = (N_SIDES) + '棱锥'; break;
+    case 'prismoid': shapeName = (N_SIDES) + '棱台'; break;
+  }
+  document.getElementById('infoShape').textContent = shapeName;
+  document.getElementById('infoK').textContent = Math.round(K * 100) + '%';
+}
+
+/* ========== 参数同步 ========== */
+const shapeSelect = document.getElementById('shapeSelect');
+const sidesInput  = document.getElementById('sidesInput');
+const inputR      = document.getElementById('inputR');
+const inputRtop   = document.getElementById('inputRtop');
+const inputH      = document.getElementById('inputH');
+const kSlider     = document.getElementById('kSlider');
+const kValue      = document.getElementById('kValue');
+const warningEl   = document.getElementById('warning');
+
+function syncParams() {
+  R = parseFloat(inputR.value) || 1;
+  H = parseFloat(inputH.value) || 2;
+  if (R <= 0) { R = 0.5; inputR.value = '0.50'; }
+  if (H <= 0) { H = 1; inputH.value = '1.00'; }
+
+  let warning = '';
+  switch (shapeType) {
+    case 'cylinder':
+      Rtop = R;
+      N_SIDES = 0;
+      inputRtop.value = R.toFixed(2);
+      inputRtop.disabled = true;
+      sidesInput.disabled = true;
+      break;
+    case 'cone':
+      Rtop = 0;
+      N_SIDES = 0;
+      inputRtop.value = '0.00';
+      inputRtop.disabled = true;
+      sidesInput.disabled = true;
+      break;
+    case 'frustum':
+      Rtop = parseFloat(inputRtop.value) || 0.5;
+      if (Rtop >= R) { Rtop = R * 0.5; inputRtop.value = Rtop.toFixed(2); warning = '⚠ r 必须小于 R，已自动调整'; }
+      if (Rtop < 0) { Rtop = 0; inputRtop.value = '0.00'; }
+      N_SIDES = 0;
+      inputRtop.disabled = false;
+      sidesInput.disabled = true;
+      break;
+    case 'prism':
+      Rtop = R;
+      N_SIDES = Math.max(3, Math.min(12, parseInt(sidesInput.value) || 4));
+      sidesInput.value = N_SIDES;
+      inputRtop.value = R.toFixed(2);
+      inputRtop.disabled = true;
+      sidesInput.disabled = false;
+      break;
+    case 'pyramid':
+      Rtop = 0;
+      N_SIDES = Math.max(3, Math.min(12, parseInt(sidesInput.value) || 4));
+      sidesInput.value = N_SIDES;
+      inputRtop.value = '0.00';
+      inputRtop.disabled = true;
+      sidesInput.disabled = false;
+      break;
+    case 'prismoid':
+      Rtop = parseFloat(inputRtop.value) || 0.5;
+      if (Rtop >= R) { Rtop = R * 0.5; inputRtop.value = Rtop.toFixed(2); warning = '⚠ r 必须小于 R，已自动调整'; }
+      if (Rtop < 0) { Rtop = 0; inputRtop.value = '0.00'; }
+      N_SIDES = Math.max(3, Math.min(12, parseInt(sidesInput.value) || 4));
+      sidesInput.value = N_SIDES;
+      inputRtop.disabled = false;
+      sidesInput.disabled = false;
+      break;
+  }
+  warningEl.textContent = warning;
+}
+
+/* ========== UI 事件 ========== */
+shapeSelect.addEventListener('change', () => {
+  shapeType = shapeSelect.value;
+  syncParams();
+  rebuildGeometry();
+  updateGeometry();
+});
+
+sidesInput.addEventListener('input', () => {
+  syncParams();
+  rebuildGeometry();
+  updateGeometry();
+});
+
+inputR.addEventListener('input', () => { syncParams(); updateGeometry(); });
+inputRtop.addEventListener('input', () => { syncParams(); updateGeometry(); });
+inputH.addEventListener('input', () => { syncParams(); updateGeometry(); });
+
+kSlider.addEventListener('input', () => {
+  K = parseFloat(kSlider.value) / 100;
+  targetK = K;
+  kValue.textContent = Math.round(K * 100) + '%';
+  updateGeometry();
+});
+
+document.getElementById('btnUnfold').onclick = () => { targetK = 1; };
+document.getElementById('btnFold').onclick   = () => { targetK = 0; };
+document.getElementById('btnReset').onclick  = () => {
+  camera.position.set(6, 6, 9);
+  controls.target.set(0, 0.8, 0);
+  controls.update();
+};
+
+/* ========== 动画循环 ========== */
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (Math.abs(targetK - K) > 0.002) {
+    K += (targetK - K) * 0.08;
+    kSlider.value = Math.round(K * 100);
+    kValue.textContent = Math.round(K * 100) + '%';
+    updateGeometry();
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ========== 初始化 ========== */
+syncParams();
+rebuildGeometry();
+updateGeometry();
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

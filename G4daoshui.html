@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>G4 虚拟倒水实验器</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: "Microsoft YaHei", sans-serif; }
+  #info {
+    position: absolute; top: 20px; left: 20px;
+    color: white; background: rgba(0,0,0,0.7);
+    padding: 15px 20px; border-radius: 8px;
+    font-size: 16px; line-height: 1.8;
+  }
+  #controls {
+    position: absolute; bottom: 30px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    padding: 15px 25px; border-radius: 10px;
+    display: flex; gap: 15px; align-items: center;
+  }
+  button {
+    padding: 10px 22px; font-size: 16px;
+    border: none; border-radius: 6px;
+    cursor: pointer; background: #4488ff;
+    color: white; font-weight: bold;
+  }
+  button:hover { background: #3366cc; }
+  button:disabled { background: #555; cursor: not-allowed; }
+  #count { color: #ffcc00; font-weight: bold; font-size: 20px; }
+</style>
+</head>
+<body>
+
+<div id="info">
+  <strong>G4 虚拟倒水实验器</strong><br>
+  圆锥装满水 → 倒入等底等高的圆柱<br>
+  已倒次数：<span id="count">0</span> / 3
+</div>
+
+<div id="controls">
+  <button id="pourBtn">倒一次水</button>
+  <button id="resetBtn">重置</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ---------- 场景 ---------- */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+/* ---------- 相机 ---------- */
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(6, 5, 9);
+
+/* ---------- 渲染器 ---------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+/* ---------- 鼠标拖拽旋转 ---------- */
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 1.5, 0);
+
+/* ---------- 光照 ---------- */
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+light1.position.set(5, 10, 7);
+scene.add(light1);
+const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
+light2.position.set(-5, 5, -7);
+scene.add(light2);
+
+/* ---------- 地面网格 ---------- */
+scene.add(new THREE.GridHelper(12, 24, 0x444466, 0x333355));
+
+/* ---------- 圆柱（右侧） ---------- */
+const cylR = 1, cylH = 3;
+const cylinder = new THREE.Mesh(
+  new THREE.CylinderGeometry(cylR, cylR, cylH, 64, 1, true),
+  new THREE.MeshStandardMaterial({
+    color: 0x88ccff, transparent: true, opacity: 0.25,
+    side: THREE.DoubleSide
+  })
+);
+cylinder.position.set(2.5, cylH / 2, 0);
+scene.add(cylinder);
+
+const cylBottom = new THREE.Mesh(
+  new THREE.CircleGeometry(cylR, 64),
+  new THREE.MeshStandardMaterial({ color: 0x88ccff, side: THREE.DoubleSide })
+);
+cylBottom.rotation.x = -Math.PI / 2;
+cylBottom.position.set(2.5, 0, 0);
+scene.add(cylBottom);
+
+/* 圆柱里的水 */
+const waterInCyl = new THREE.Mesh(
+  new THREE.CylinderGeometry(cylR * 0.98, cylR * 0.98, 1, 64),
+  new THREE.MeshStandardMaterial({
+    color: 0x2288ff, transparent: true, opacity: 0.75
+  })
+);
+waterInCyl.position.set(2.5, 0, 0);
+waterInCyl.scale.y = 0.001;
+scene.add(waterInCyl);
+
+/* ---------- 圆锥（左侧） ---------- */
+const coneR = 1, coneH = 3;
+const cone = new THREE.Mesh(
+  new THREE.ConeGeometry(coneR, coneH, 64, 1, true),
+  new THREE.MeshStandardMaterial({
+    color: 0xffcc88, transparent: true, opacity: 0.25,
+    side: THREE.DoubleSide
+  })
+);
+cone.position.set(-2.5, coneH / 2, 0);
+scene.add(cone);
+
+const coneBottom = new THREE.Mesh(
+  new THREE.CircleGeometry(coneR, 64),
+  new THREE.MeshStandardMaterial({ color: 0xffcc88, side: THREE.DoubleSide })
+);
+coneBottom.rotation.x = -Math.PI / 2;
+coneBottom.position.set(-2.5, 0, 0);
+scene.add(coneBottom);
+
+/* 圆锥里的水（用缩放模拟倒空） */
+const waterInCone = new THREE.Mesh(
+  new THREE.ConeGeometry(coneR * 0.95, coneH * 0.98, 64),
+  new THREE.MeshStandardMaterial({
+    color: 0x2288ff, transparent: true, opacity: 0.75
+  })
+);
+waterInCone.position.set(-2.5, coneH / 2, 0);
+scene.add(waterInCone);
+
+/* ---------- 倒水逻辑 ---------- */
+let pourCount = 0;
+const maxPours = 3;
+
+const pourBtn = document.getElementById('pourBtn');
+const resetBtn = document.getElementById('resetBtn');
+const countEl = document.getElementById('count');
+
+let targetWaterH = 0;
+let currentWaterH = 0;
+let targetConeScale = 1;
+let currentConeScale = 1;
+
+pourBtn.onclick = () => {
+  if (pourCount >= maxPours) return;
+  pourCount++;
+  countEl.textContent = pourCount;
+  targetWaterH = pourCount * (cylH / 3);
+  targetConeScale = 0.001;
+  pourBtn.disabled = true;
+  resetBtn.disabled = true;
+  setTimeout(() => {
+    pourBtn.disabled = false;
+    resetBtn.disabled = false;
+    if (pourCount >= maxPours) {
+      pourBtn.disabled = true;
+    }
+  }, 900);
+};
+
+resetBtn.onclick = () => {
+  pourCount = 0;
+  countEl.textContent = 0;
+  targetWaterH = 0;
+  currentWaterH = 0;
+  targetConeScale = 1;
+  currentConeScale = 1;
+  waterInCyl.scale.y = 0.001;
+  waterInCyl.position.y = 0;
+  waterInCone.scale.set(1, 1, 1);
+  waterInCone.position.y = coneH / 2;
+  pourBtn.disabled = false;
+};
+
+/* ---------- 动画循环 ---------- */
+function animate() {
+  requestAnimationFrame(animate);
+
+  /* 水位平滑过渡 */
+  currentWaterH += (targetWaterH - currentWaterH) * 0.08;
+  if (currentWaterH < 0.001) currentWaterH = 0.001;
+  waterInCyl.scale.y = currentWaterH;
+  waterInCyl.position.y = currentWaterH / 2;
+
+  /* 圆锥里的水逐渐消失 */
+  currentConeScale += (targetConeScale - currentConeScale) * 0.08;
+  if (currentConeScale < 0.001) currentConeScale = 0.001;
+  waterInCone.scale.set(currentConeScale, currentConeScale, currentConeScale);
+  waterInCone.position.y = (coneH / 2) * currentConeScale;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ---------- 窗口自适应 ---------- */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

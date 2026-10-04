@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>G2 祖暅原理演示器</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: "Microsoft YaHei", sans-serif; background: #1a1a2e; color: white; }
+
+  #title {
+    position: absolute; top: 20px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 19px; color: #66ccff;
+    background: rgba(0,0,0,0.72);
+    padding: 8px 24px; border-radius: 20px;
+    font-weight: bold; letter-spacing: 2px;
+  }
+
+  #info {
+    position: absolute; top: 20px; left: 20px;
+    background: rgba(0,0,0,0.78);
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 14px; line-height: 1.9; min-width: 260px;
+  }
+  #info h3 { margin: 0 0 8px; color: #66ccff; font-size: 15px; }
+  .row-info { display: flex; justify-content: space-between; gap: 16px; }
+  .val { color: #88ffbb; font-weight: bold; }
+  .big { color: #ffcc00; font-weight: bold; font-size: 16px; }
+  .same { color: #88ff88; font-weight: bold; font-size: 15px; }
+
+  #hint {
+    position: absolute; top: 20px; right: 20px;
+    background: rgba(0,0,0,0.7); padding: 12px 18px; border-radius: 8px;
+    font-size: 13px; line-height: 1.75; max-width: 240px; color: #aaccff;
+  }
+  #hint strong { color: #ffcc00; }
+
+  #controls {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.88); padding: 18px 26px; border-radius: 12px;
+    display: flex; flex-direction: column; gap: 12px; min-width: 620px;
+  }
+  .row { display: flex; gap: 12px; align-items: center; justify-content: center; }
+  .row label { font-size: 14px; color: #ccc; white-space: nowrap; }
+  #hSlider { flex: 1; height: 6px; cursor: pointer; }
+  #hValue { color: #ffcc00; font-weight: bold; font-size: 16px; min-width: 60px; text-align: right; }
+  #btnRow button {
+    padding: 8px 18px; font-size: 13px;
+    border: none; border-radius: 6px; cursor: pointer;
+    background: #4488ff; color: white; font-weight: bold; font-family: inherit;
+  }
+  #btnRow button:hover { background: #3366cc; }
+
+  .legend {
+    position: absolute; bottom: 165px; right: 20px;
+    background: rgba(0,0,0,0.72);
+    padding: 12px 18px; border-radius: 8px;
+    font-size: 13px; line-height: 1.9; color: white;
+  }
+  .dot { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+  .d1 { background: #66ccff; }
+  .d2 { background: #ff8866; }
+  .d3 { background: #ffcc00; }
+</style>
+</head>
+<body>
+
+<div id="title">G2 祖暅原理演示器</div>
+
+<div id="info">
+  <h3>数据面板</h3>
+  <div class="row-info"><span>切割高度 h</span><span class="val" id="infoH">0.750</span></div>
+  <div class="row-info"><span>左侧截面面积</span><span class="val" id="areaLeft">0</span></div>
+  <div class="row-info"><span>右侧截面面积</span><span class="val" id="areaRight">0</span></div>
+  <div class="row-info"><span>是否相等</span><span class="same" id="isEqual">✓ 相等</span></div>
+  <div class="row-info"><span>共同公式</span><span class="val">π(R² − h²)</span></div>
+  <div class="row-info"><span>半球体积</span><span class="val" id="volHemi">0</span></div>
+  <div class="row-info"><span>圆柱挖锥体积</span><span class="val" id="volCyl">0</span></div>
+</div>
+
+<div id="hint">
+  💡 <strong>祖暅原理</strong><br>
+  两个等高的立体，若被任一平行于底面的平面截得的截面面积都相等，则它们的体积相等。<br><br>
+  拖动下方滑块改变切割高度，观察两侧截面面积是否总是相等。
+</div>
+
+<div class="legend">
+  <div><span class="dot d1"></span>立体表面（蓝）</div>
+  <div><span class="dot d2"></span>挖去的圆锥（橙）</div>
+  <div><span class="dot d3"></span>截面（黄）</div>
+</div>
+
+<div id="controls">
+  <div class="row">
+    <label>切割高度 h</label>
+    <input type="range" id="hSlider" min="0" max="100" value="50" step="1">
+    <span id="hValue">0.750</span>
+  </div>
+  <div class="row" id="btnRow">
+    <button id="btnBottom">h = 0（底面）</button>
+    <button id="btnMiddle">h = R/2</button>
+    <button id="btnTop">h = R（顶点）</button>
+    <button id="btnReset">重置视角</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============ 参数 ============ */
+const R = 1.5;                 // 半球和圆柱的半径 = 高
+const LEFT_X  = -2.5;
+const RIGHT_X =  2.5;
+let h = R * 0.5;               // 当前切割高度
+
+/* ============ 场景 ============ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(0, 4.5, 9);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, R * 0.5, 0);
+
+/* ============ 光照 ============ */
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dl1 = new THREE.DirectionalLight(0xffffff, 1.2);
+dl1.position.set(5, 10, 7); scene.add(dl1);
+const dl2 = new THREE.DirectionalLight(0x88aaff, 0.5);
+dl2.position.set(-5, 4, -7); scene.add(dl2);
+
+/* ============ 地面网格 ============ */
+const grid = new THREE.GridHelper(16, 32, 0x444466, 0x2a2a44);
+scene.add(grid);
+
+/* ============ 工具函数 ============ */
+function makeArc(center, radius, axis) {
+  const pts = [];
+  const N = 64;
+  for (let i = 0; i <= N; i++) {
+    const t = (i / N) * Math.PI / 2;
+    if (axis === 'x') {
+      pts.push(new THREE.Vector3(center.x + radius * Math.sin(t), center.y + radius * Math.cos(t), center.z));
+    } else {
+      pts.push(new THREE.Vector3(center.x, center.y + radius * Math.cos(t), center.z + radius * Math.sin(t)));
+    }
+  }
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0x66ccff })
+  );
+}
+
+function makeCircle(center, radius, color) {
+  const pts = [];
+  const N = 96;
+  for (let i = 0; i <= N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    pts.push(new THREE.Vector3(center.x + radius * Math.cos(t), center.y, center.z + radius * Math.sin(t)));
+  }
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color })
+  );
+}
+
+/* ============ 左侧：半球 ============ */
+const hemiGeo = new THREE.SphereGeometry(R, 64, 48, 0, Math.PI * 2, 0, Math.PI / 2);
+const hemiMat = new THREE.MeshStandardMaterial({
+  color: 0x66ccff, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.28,
+  roughness: 0.5, metalness: 0.1,
+  depthWrite: false,
+});
+const hemisphere = new THREE.Mesh(hemiGeo, hemiMat);
+hemisphere.position.set(LEFT_X, 0, 0);
+scene.add(hemisphere);
+
+/* 侧面竖直大圆轮廓线 */
+scene.add(makeArc(new THREE.Vector3(LEFT_X, 0, 0), R, 'x'));
+scene.add(makeArc(new THREE.Vector3(LEFT_X, 0, 0), R, 'z'));
+
+/* 底面大圆 */
+scene.add(makeCircle(new THREE.Vector3(LEFT_X, 0, 0), R, 0x66ccff));
+
+/* ============ 右侧：圆柱挖去圆锥 ============ */
+/* 圆柱外壁（上下不封闭） */
+const cylGeo = new THREE.CylinderGeometry(R, R, R, 64, 1, true);
+const cylMat = new THREE.MeshStandardMaterial({
+  color: 0x66ccff, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.22,
+  roughness: 0.5, metalness: 0.1,
+  depthWrite: false,
+});
+const cylinder = new THREE.Mesh(cylGeo, cylMat);
+cylinder.position.set(RIGHT_X, R / 2, 0);
+scene.add(cylinder);
+
+/* 上下轮廓圆 */
+scene.add(makeCircle(new THREE.Vector3(RIGHT_X, 0, 0), R, 0x66ccff));
+scene.add(makeCircle(new THREE.Vector3(RIGHT_X, R, 0), R, 0x66ccff));
+
+/* 竖直边线（4 条母线） */
+const vLineMat = new THREE.LineBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.55 });
+[[-R, 0], [R, 0], [0, -R], [0, R]].forEach(([dx, dz]) => {
+  const pts = [
+    new THREE.Vector3(RIGHT_X + dx, 0, dz),
+    new THREE.Vector3(RIGHT_X + dx, R, dz),
+  ];
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), vLineMat));
+});
+
+/* 内锥面：锥顶在下（y=0），锥底在上（y=R） */
+const innerConeGeo = new THREE.ConeGeometry(R, R, 64, 1, true);
+const innerConeMat = new THREE.MeshStandardMaterial({
+  color: 0xff8866, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.45,
+  roughness: 0.5, metalness: 0.1,
+  depthWrite: false,
+});
+const innerCone = new THREE.Mesh(innerConeGeo, innerConeMat);
+innerCone.rotation.x = Math.PI;
+innerCone.position.set(RIGHT_X, R / 2, 0);
+scene.add(innerCone);
+
+/* ============ 切割平面 ============ */
+const planeGeo = new THREE.PlaneGeometry(9, 4);
+planeGeo.rotateX(-Math.PI / 2);
+const planeMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.05,
+});
+const cutPlane = new THREE.Mesh(planeGeo, planeMat);
+cutPlane.position.y = h;
+scene.add(cutPlane);
+
+/* ============ 截面高亮 ============ */
+/* 左侧圆截面 */
+let sliceLeftGeom = new THREE.CircleGeometry(R * 0.866, 96);
+sliceLeftGeom.rotateX(-Math.PI / 2);
+const sliceLeftMat = new THREE.MeshBasicMaterial({
+  color: 0xffcc00, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.72,
+});
+const sliceLeft = new THREE.Mesh(sliceLeftGeom, sliceLeftMat);
+sliceLeft.position.set(LEFT_X, h + 0.003, 0);
+scene.add(sliceLeft);
+
+/* 右侧圆环截面 */
+let sliceRightGeom = new THREE.RingGeometry(R * 0.5, R, 96);
+sliceRightGeom.rotateX(-Math.PI / 2);
+const sliceRightMat = new THREE.MeshBasicMaterial({
+  color: 0xffcc00, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.72,
+});
+const sliceRight = new THREE.Mesh(sliceRightGeom, sliceRightMat);
+sliceRight.position.set(RIGHT_X, h + 0.003, 0);
+scene.add(sliceRight);
+
+/* ============ 更新逻辑 ============ */
+const hSlider = document.getElementById('hSlider');
+const hValue  = document.getElementById('hValue');
+
+function update() {
+  cutPlane.position.y = h;
+
+  /* 左侧：半圆截面，半径 √(R²−h²) */
+  const r1 = Math.sqrt(Math.max(0.001, R * R - h * h));
+  sliceLeft.geometry.dispose();
+  const g1 = new THREE.CircleGeometry(r1, 96);
+  g1.rotateX(-Math.PI / 2);
+  sliceLeft.geometry = g1;
+  sliceLeft.position.y = h + 0.003;
+
+  /* 右侧：圆环截面，外半径 R，内半径 h */
+  const inner = Math.max(0.001, Math.min(h, R - 0.002));
+  sliceRight.geometry.dispose();
+  const g2 = new THREE.RingGeometry(inner, R, 96);
+  g2.rotateX(-Math.PI / 2);
+  sliceRight.geometry = g2;
+  sliceRight.position.y = h + 0.003;
+
+  /* 数据面板 */
+  const area = Math.PI * (R * R - h * h);
+  document.getElementById('infoH').textContent = h.toFixed(3);
+  document.getElementById('areaLeft').textContent = area.toFixed(4);
+  document.getElementById('areaRight').textContent = area.toFixed(4);
+  document.getElementById('volHemi').textContent = (2 / 3 * Math.PI * Math.pow(R, 3)).toFixed(4);
+  document.getElementById('volCyl').textContent = (2 / 3 * Math.PI * Math.pow(R, 3)).toFixed(4);
+
+  hValue.textContent = h.toFixed(3);
+  hSlider.value = (h / R) * 100;
+}
+
+/* ============ 事件 ============ */
+hSlider.addEventListener('input', () => {
+  h = (parseFloat(hSlider.value) / 100) * R;
+  update();
+});
+
+document.getElementById('btnBottom').onclick = () => { h = 0;      update(); };
+document.getElementById('btnMiddle').onclick = () => { h = R / 2;  update(); };
+document.getElementById('btnTop').onclick    = () => { h = R;      update(); };
+document.getElementById('btnReset').onclick  = () => {
+  camera.position.set(0, 4.5, 9);
+  controls.target.set(0, R * 0.5, 0);
+  controls.update();
+};
+
+/* ============ 动画循环 ============ */
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ============ 初始化 ============ */
+update();
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

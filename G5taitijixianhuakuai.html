@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>G5 台体极限滑块</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: "Microsoft YaHei", sans-serif; background: #1a1a2e; color: white; }
+
+  #title {
+    position: absolute; top: 20px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 19px; color: #66ccff;
+    background: rgba(0,0,0,0.72);
+    padding: 8px 24px; border-radius: 20px;
+    font-weight: bold; letter-spacing: 2px;
+  }
+
+  #info {
+    position: absolute; top: 80px; left: 20px;
+    background: rgba(0,0,0,0.78);
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 14px; line-height: 1.9; min-width: 300px;
+  }
+  #info h3 { margin: 0 0 8px; color: #66ccff; font-size: 15px; }
+  .row-info { display: flex; justify-content: space-between; gap: 16px; }
+  .val { color: #88ffbb; font-weight: bold; }
+  .big { color: #ffcc00; font-weight: bold; font-size: 16px; }
+  .shapeName { color: #ff8866; font-weight: bold; font-size: 17px; }
+
+  #formula {
+    position: absolute; top: 80px; right: 20px;
+    background: rgba(0,0,0,0.78);
+    padding: 16px 22px; border-radius: 10px;
+    font-size: 15px; line-height: 2.2; min-width: 320px;
+  }
+  #formula h3 { margin: 0 0 10px; color: #66ccff; font-size: 15px; }
+  .term { display: flex; justify-content: space-between; gap: 20px; }
+  .term-name { color: #aaa; }
+  .term-val { color: #ffcc00; font-weight: bold; font-family: "Consolas", monospace; }
+  .term-val.active { color: #88ff88; }
+  #formula .hint { color: #888; font-size: 12px; margin-top: 8px; }
+
+  #legend {
+    position: absolute; bottom: 190px; right: 20px;
+    background: rgba(0,0,0,0.72);
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; line-height: 1.85; color: white;
+  }
+  .dot { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+
+  #controls {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.88); padding: 18px 26px; border-radius: 12px;
+    display: flex; flex-direction: column; gap: 12px; min-width: 680px;
+  }
+  .row { display: flex; gap: 12px; align-items: center; }
+  .row label { font-size: 14px; color: #ccc; white-space: nowrap; }
+  #rSlider { flex: 1; height: 6px; cursor: pointer; }
+  #rValue { color: #ffcc00; font-weight: bold; font-size: 16px; min-width: 70px; text-align: right; }
+  #btnRow button {
+    padding: 8px 18px; font-size: 13px;
+    border: none; border-radius: 6px; cursor: pointer;
+    background: #4488ff; color: white; font-weight: bold; font-family: inherit;
+  }
+  #btnRow button:hover { background: #3366cc; }
+  #btnCone { background: #ff8866; } #btnCone:hover { background: #cc6644; }
+  #btnCyl  { background: #66cc88; } #btnCyl:hover  { background: #44aa66; }
+
+  #warning { color: #88ff88; font-size: 13px; text-align: center; height: 16px; }
+</style>
+</head>
+<body>
+
+<div id="title">G5 台体极限滑块</div>
+
+<div id="info">
+  <h3>数据面板</h3>
+  <div class="row-info"><span>下底半径 R</span><span class="val">1.50</span></div>
+  <div class="row-info"><span>上底半径 r</span><span class="val" id="infoR">0.75</span></div>
+  <div class="row-info"><span>高 h</span><span class="val">2.00</span></div>
+  <div class="row-info"><span>母线长 l</span><span class="val" id="infoL">2.14</span></div>
+  <div class="row-info"><span>当前图形</span><span class="shapeName" id="infoShape">圆台</span></div>
+  <div class="row-info"><span>体积 V</span><span class="big" id="infoV">0</span></div>
+</div>
+
+<div id="formula">
+  <h3>体积公式的退化</h3>
+  <div style="color:#aaa; font-size:13px; margin-bottom:10px;">
+    V = (πh/3) · (R² + R·r + r²)
+  </div>
+  <div class="term">
+    <span class="term-name">R² =</span>
+    <span class="term-val" id="termR2">0</span>
+  </div>
+  <div class="term">
+    <span class="term-name">R·r =</span>
+    <span class="term-val" id="termRr">0</span>
+  </div>
+  <div class="term">
+    <span class="term-name">r² =</span>
+    <span class="term-val" id="termR2b">0</span>
+  </div>
+  <div class="term" style="border-top:1px solid #555; margin-top:6px; padding-top:6px;">
+    <span class="term-name">三项之和 =</span>
+    <span class="term-val" id="termSum">0</span>
+  </div>
+  <div class="hint" id="formulaHint">拖动滑块，观察哪一项在起作用</div>
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#66ccff"></span>侧面</div>
+  <div><span class="dot" style="background:#ffcc00"></span>上底圆</div>
+  <div><span class="dot" style="background:#ff8866"></span>下底圆</div>
+</div>
+
+<div id="controls">
+  <div class="row">
+    <label>上底半径 r</label>
+    <input type="range" id="rSlider" min="0" max="100" value="50" step="1">
+    <span id="rValue">0.75</span>
+  </div>
+  <div class="row" id="btnRow" style="justify-content:center;">
+    <button id="btnCone">圆锥 (r = 0)</button>
+    <button id="btnCyl">圆柱 (r = R)</button>
+    <button id="btnAnimate">自动演示</button>
+    <button id="btnReset">重置视角</button>
+  </div>
+  <div id="warning"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============ 参数 ============ */
+const R = 1.5;             // 下底半径（固定）
+const H = 2.0;             // 高（固定）
+let Rtop = 0.75;           // 上底半径（可变）
+let animating = false;
+let animDir = 1;
+
+/* ============ 场景 ============ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(5, 4.5, 6.5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, H / 2, 0);
+
+/* ============ 光照 ============ */
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dl1 = new THREE.DirectionalLight(0xffffff, 1.2);
+dl1.position.set(5, 10, 7); scene.add(dl1);
+const dl2 = new THREE.DirectionalLight(0x88aaff, 0.5);
+dl2.position.set(-5, 4, -7); scene.add(dl2);
+
+/* ============ 地面网格 ============ */
+const grid = new THREE.GridHelper(14, 28, 0x444466, 0x2a2a44);
+grid.position.y = -0.01;
+scene.add(grid);
+
+/* ============ 侧面 ============ */
+const R_SEG = 128;
+const sideGeom = new THREE.BufferGeometry();
+const vCount = (R_SEG + 1) * 2;
+sideGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vCount * 3), 3));
+sideGeom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(vCount * 3), 3));
+
+const indices = [];
+for (let i = 0; i < R_SEG; i++) {
+  const a = i, b = i + 1;
+  const c = i + R_SEG + 1, d = i + R_SEG + 2;
+  indices.push(a, b, d, a, d, c);
+}
+sideGeom.setIndex(indices);
+
+const sideMat = new THREE.MeshStandardMaterial({
+  color: 0x66ccff, side: THREE.DoubleSide,
+  roughness: 0.45, metalness: 0.1,
+  emissive: 0x113355, emissiveIntensity: 0.28,
+  transparent: true, opacity: 0.9,
+});
+const sideMesh = new THREE.Mesh(sideGeom, sideMat);
+sideMesh.frustumCulled = false;
+scene.add(sideMesh);
+
+/* ============ 上下底圆轮廓 ============ */
+const C_SEG = 128;
+
+const topGeom = new THREE.BufferGeometry();
+topGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array((C_SEG + 1) * 3), 3));
+const topLine = new THREE.Line(topGeom, new THREE.LineBasicMaterial({ color: 0xffcc00 }));
+topLine.frustumCulled = false;
+scene.add(topLine);
+
+const botGeom = new THREE.BufferGeometry();
+botGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array((C_SEG + 1) * 3), 3));
+const botLine = new THREE.Line(botGeom, new THREE.LineBasicMaterial({ color: 0xff8866 }));
+botLine.frustumCulled = false;
+scene.add(botLine);
+
+/* ============ 底面填充（半透明，让底能看清） ============ */
+const botFill = new THREE.Mesh(
+  new THREE.CircleGeometry(R, 64),
+  new THREE.MeshBasicMaterial({
+    color: 0xff8866, transparent: true, opacity: 0.18, side: THREE.DoubleSide
+  })
+);
+botFill.rotation.x = -Math.PI / 2;
+scene.add(botFill);
+
+const topFill = new THREE.Mesh(
+  new THREE.CircleGeometry(1, 64),
+  new THREE.MeshBasicMaterial({
+    color: 0xffcc00, transparent: true, opacity: 0.18, side: THREE.DoubleSide
+  })
+);
+topFill.rotation.x = -Math.PI / 2;
+topFill.position.y = H;
+scene.add(topFill);
+
+/* ============ 更新几何 ============ */
+function updateGeometry() {
+  const sideArr = sideGeom.attributes.position.array;
+  const normalArr = sideGeom.attributes.normal.array;
+
+  /* 侧面顶点：下层 r=R 在 y=0，上层 r=Rtop 在 y=H */
+  for (let i = 0; i <= R_SEG; i++) {
+    const theta = (i / R_SEG) * Math.PI * 2;
+    const x1 = R * Math.cos(theta);
+    const z1 = R * Math.sin(theta);
+    sideArr[i * 3]     = x1;
+    sideArr[i * 3 + 1] = 0;
+    sideArr[i * 3 + 2] = z1;
+
+    const x2 = Rtop * Math.cos(theta);
+    const z2 = Rtop * Math.sin(theta);
+    const j = i + R_SEG + 1;
+    sideArr[j * 3]     = x2;
+    sideArr[j * 3 + 1] = H;
+    sideArr[j * 3 + 2] = z2;
+  }
+  sideGeom.attributes.position.needsUpdate = true;
+  sideGeom.computeVertexNormals();
+
+  /* 上底圆 */
+  const tp = topGeom.attributes.position.array;
+  for (let i = 0; i <= C_SEG; i++) {
+    const theta = (i / C_SEG) * Math.PI * 2;
+    tp[i * 3]     = Rtop * Math.cos(theta);
+    tp[i * 3 + 1] = H;
+    tp[i * 3 + 2] = Rtop * Math.sin(theta);
+  }
+  topGeom.attributes.position.needsUpdate = true;
+  topLine.visible = Rtop > 0.03;
+
+  /* 下底圆 */
+  const bp = botGeom.attributes.position.array;
+  for (let i = 0; i <= C_SEG; i++) {
+    const theta = (i / C_SEG) * Math.PI * 2;
+    bp[i * 3]     = R * Math.cos(theta);
+    bp[i * 3 + 1] = 0;
+    bp[i * 3 + 2] = R * Math.sin(theta);
+  }
+  botGeom.attributes.position.needsUpdate = true;
+
+  /* 上底填充 */
+  topFill.geometry.dispose();
+  if (Rtop > 0.03) {
+    topFill.geometry = new THREE.CircleGeometry(Rtop, 64);
+  } else {
+    topFill.geometry = new THREE.CircleGeometry(0.001, 8);
+  }
+  topFill.rotation.x = -Math.PI / 2;
+  topFill.position.y = H;
+  topFill.visible = Rtop > 0.03;
+
+  updateInfo();
+}
+
+/* ============ 信息面板 ============ */
+function updateInfo() {
+  const Delta = R - Rtop;
+  const l = Math.sqrt(Delta * Delta + H * H);
+  const V = (Math.PI * H / 3) * (R * R + R * Rtop + Rtop * Rtop);
+
+  document.getElementById('infoR').textContent = Rtop.toFixed(3);
+  document.getElementById('infoL').textContent = l.toFixed(3);
+  document.getElementById('infoV').textContent = V.toFixed(4);
+
+  /* 图形名称 */
+  let shapeName;
+  if (Rtop < 0.02) shapeName = '圆锥';
+  else if (Math.abs(Rtop - R) < 0.02) shapeName = '圆柱';
+  else shapeName = '圆台';
+  document.getElementById('infoShape').textContent = shapeName;
+
+  /* 公式三项 */
+  const R2 = R * R;
+  const Rr = R * Rtop;
+  const r2 = Rtop * Rtop;
+  const sum = R2 + Rr + r2;
+
+  document.getElementById('termR2').textContent = R2.toFixed(4);
+  document.getElementById('termRr').textContent = Rr.toFixed(4);
+  document.getElementById('termR2b').textContent = r2.toFixed(4);
+  document.getElementById('termSum').textContent = sum.toFixed(4);
+
+  /* 高亮当前起主导作用的项 */
+  const termR2El  = document.getElementById('termR2');
+  const termRrEl  = document.getElementById('termRr');
+  const termR2bEl = document.getElementById('termR2b');
+  termR2El.classList.remove('active');
+  termRrEl.classList.remove('active');
+  termR2bEl.classList.remove('active');
+
+  if (Rtop < 0.02) {
+    termR2El.classList.add('active');
+  } else if (Math.abs(Rtop - R) < 0.02) {
+    termR2El.classList.add('active');
+    termRrEl.classList.add('active');
+    termR2bEl.classList.add('active');
+  } else {
+    termR2El.classList.add('active');
+    termRrEl.classList.add('active');
+    termR2bEl.classList.add('active');
+  }
+
+  /* 提示语 */
+  let hint;
+  if (Rtop < 0.02) {
+    hint = 'r = 0 → V = (πh/3)·R² = 圆锥公式';
+  } else if (Math.abs(Rtop - R) < 0.02) {
+    hint = 'r = R → V = πR²h = 圆柱公式';
+  } else {
+    hint = '0 < r < R → 三项都在起作用';
+  }
+  document.getElementById('formulaHint').textContent = hint;
+
+  /* 底部进度条 */
+  document.getElementById('rValue').textContent = Rtop.toFixed(3);
+  document.getElementById('rSlider').value = (Rtop / R) * 100;
+}
+
+/* ============ 事件 ============ */
+const rSlider = document.getElementById('rSlider');
+const warningEl = document.getElementById('warning');
+
+rSlider.addEventListener('input', () => {
+  Rtop = (parseFloat(rSlider.value) / 100) * R;
+  animating = false;
+  updateGeometry();
+});
+
+document.getElementById('btnCone').onclick = () => {
+  Rtop = 0;
+  animating = false;
+  updateGeometry();
+  warningEl.textContent = '✓ 已退化为圆锥：V = (1/3)πR²h';
+  setTimeout(() => warningEl.textContent = '', 2500);
+};
+
+document.getElementById('btnCyl').onclick = () => {
+  Rtop = R;
+  animating = false;
+  updateGeometry();
+  warningEl.textContent = '✓ 已退化为圆柱：V = πR²h';
+  setTimeout(() => warningEl.textContent = '', 2500);
+};
+
+document.getElementById('btnAnimate').onclick = () => {
+  animating = !animating;
+  document.getElementById('btnAnimate').textContent = animating ? '暂停演示' : '自动演示';
+};
+
+document.getElementById('btnReset').onclick = () => {
+  camera.position.set(5, 4.5, 6.5);
+  controls.target.set(0, H / 2, 0);
+  controls.update();
+};
+
+/* ============ 动画循环 ============ */
+let lastTime = performance.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now = performance.now();
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
+
+  if (animating) {
+    Rtop += animDir * dt * 0.55;
+    if (Rtop >= R) { Rtop = R; animDir = -1; }
+    if (Rtop <= 0) { Rtop = 0; animDir = 1; }
+    updateGeometry();
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ============ 初始化 ============ */
+updateGeometry();
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>G9 三维模型观察资源</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: "Microsoft YaHei", sans-serif; background: #1a1a2e; color: white; }
+
+  #title {
+    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+    font-size: 18px; color: #66ccff;
+    background: rgba(0,0,0,0.72);
+    padding: 8px 24px; border-radius: 20px;
+    font-weight: bold; letter-spacing: 2px;
+  }
+
+  #info {
+    position: absolute; top: 78px; left: 20px;
+    background: rgba(0,0,0,0.78);
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 14px; line-height: 1.9; min-width: 260px;
+    max-width: 320px;
+  }
+  #info h3 { margin: 0 0 10px; color: #66ccff; font-size: 16px; }
+  .row-info { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
+  .row-info span:first-child { color: #aaa; }
+  .row-info .val { color: #88ffbb; font-weight: bold; text-align: right; }
+
+  #hint {
+    position: absolute; top: 78px; right: 20px;
+    background: rgba(0,0,0,0.7); padding: 12px 18px; border-radius: 8px;
+    font-size: 13px; line-height: 1.8; max-width: 220px; color: #aaccff;
+  }
+  #hint strong { color: #ffcc00; }
+
+  #legend {
+    position: absolute; bottom: 130px; right: 20px;
+    background: rgba(0,0,0,0.72);
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; line-height: 1.85;
+  }
+  .dot { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+
+  #controls {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.9); padding: 14px 22px; border-radius: 12px;
+    display: flex; gap: 14px; align-items: center;
+  }
+  #controls label { font-size: 14px; color: #ccc; white-space: nowrap; }
+  #modelSelect {
+    padding: 8px 14px; background: #1a1a2e; color: #88ccff;
+    border: 1px solid #4488ff; border-radius: 6px;
+    font-size: 14px; font-weight: bold; font-family: inherit;
+    min-width: 260px;
+  }
+  #controls button {
+    padding: 8px 18px; font-size: 13px;
+    border: none; border-radius: 6px; cursor: pointer;
+    background: #4488ff; color: white; font-weight: bold; font-family: inherit;
+  }
+  #controls button:hover { background: #3366cc; }
+</style>
+</head>
+<body>
+
+<div id="title">G9 三维模型观察</div>
+
+<div id="info">
+  <h3 id="modelName">正方体</h3>
+  <div id="infoRows"></div>
+</div>
+
+<div id="hint">
+  💡 <strong>操作</strong><br>
+  • 鼠标左键拖动：旋转<br>
+  • 滚轮：缩放<br>
+  • 右键拖动：平移<br>
+  • 下拉菜单切换模型
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#66ccff"></span>主体</div>
+  <div><span class="dot" style="background:#ff8866"></span>外接球</div>
+  <div><span class="dot" style="background:#66ff88"></span>内切球</div>
+  <div><span class="dot" style="background:#ffaa44"></span>附加部件</div>
+</div>
+
+<div id="controls">
+  <label>模型</label>
+  <select id="modelSelect"></select>
+  <button id="btnReset">重置视角</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============ 场景 ============ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(4.5, 3.8, 5.5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 0, 0);
+
+/* ============ 光照 ============ */
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dl1 = new THREE.DirectionalLight(0xffffff, 1.1);
+dl1.position.set(5, 8, 7); scene.add(dl1);
+const dl2 = new THREE.DirectionalLight(0x88aaff, 0.6);
+dl2.position.set(-5, 3, -7); scene.add(dl2);
+const dl3 = new THREE.DirectionalLight(0xffffff, 0.5);
+dl3.position.set(0, -6, 0); scene.add(dl3);
+
+/* ============ 地面网格 ============ */
+const grid = new THREE.GridHelper(14, 28, 0x444466, 0x2a2a44);
+grid.position.y = -2;
+scene.add(grid);
+
+/* ============ 工具函数 ============ */
+function solid(geo, color = 0x66ccff, opacity = 0.42) {
+  return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color, side: THREE.DoubleSide,
+    transparent: true, opacity,
+    roughness: 0.5, metalness: 0.1,
+    emissive: color, emissiveIntensity: 0.1,
+    depthWrite: false,
+  }));
+}
+
+function edges(geo, color = 0xffffff, opacity = 0.75) {
+  const e = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo, 12),
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity })
+  );
+  return e;
+}
+
+function sphereMesh(r, color, opacity = 0.22) {
+  return solid(new THREE.SphereGeometry(r, 48, 32), color, opacity);
+}
+
+function circleLine(radius, y, color = 0xffffff, opacity = 0.7) {
+  const pts = [];
+  const N = 72;
+  for (let i = 0; i <= N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    pts.push(new THREE.Vector3(radius * Math.cos(t), y, radius * Math.sin(t)));
+  }
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity })
+  );
+}
+
+/* ============ 正四面体几何体 ============ */
+function makeTetra(a) {
+  const s = a / (2 * Math.SQRT2);
+  const verts = [
+    [ s,  s,  s],
+    [ s, -s, -s],
+    [-s,  s, -s],
+    [-s, -s,  s],
+  ];
+  const faces = [[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]];
+  const pos = [];
+  for (const f of faces) {
+    for (const i of f) {
+      pos.push(verts[i][0], verts[i][1], verts[i][2]);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* ============ 15 个模型定义 ============ */
+const MODELS = [
+
+  /* 1. 正方体 */
+  {
+    id: 'cube',
+    name: '1. 正方体',
+    build: () => {
+      const g = new THREE.Group();
+      const a = 2;
+      const geo = new THREE.BoxGeometry(a, a, a);
+      g.add(solid(geo));
+      g.add(edges(geo));
+      return { g, info: [
+        ['棱长', 'a = 2'],
+        ['体积', 'V = a³ = 8'],
+        ['表面积', 'S = 6a² = 24'],
+        ['体对角线', 'd = √3·a ≈ 3.464'],
+      ]};
+    }
+  },
+
+  /* 2. 长方体 + 外接球 */
+  {
+    id: 'cuboid-circ',
+    name: '2. 长方体 + 外接球',
+    build: () => {
+      const g = new THREE.Group();
+      const L = 2.4, W = 1.6, H = 1.2;
+      const geo = new THREE.BoxGeometry(L, W, H);
+      g.add(solid(geo));
+      g.add(edges(geo));
+      const R = Math.sqrt((L/2)**2 + (W/2)**2 + (H/2)**2);
+      g.add(sphereMesh(R, 0xff8866, 0.13));
+      return { g, info: [
+        ['长宽高', `${L} × ${W} × ${H}`],
+        ['体对角线', `d ≈ ${(2*R).toFixed(3)}`],
+        ['外接球半径', `R = d/2 ≈ ${R.toFixed(3)}`],
+        ['结论', '8 个顶点都在球面上'],
+      ]};
+    }
+  },
+
+  /* 3. 正方体 + 内切球 + 外接球 */
+  {
+    id: 'cube-both',
+    name: '3. 正方体 + 内切球 + 外接球',
+    build: () => {
+      const g = new THREE.Group();
+      const a = 2;
+      const geo = new THREE.BoxGeometry(a, a, a);
+      g.add(solid(geo, 0x66ccff, 0.35));
+      g.add(edges(geo));
+      g.add(sphereMesh(a/2, 0x66ff88, 0.28));
+      g.add(sphereMesh(a*Math.sqrt(3)/2, 0xff8866, 0.09));
+      return { g, info: [
+        ['棱长', 'a = 2'],
+        ['内切球半径', 'r = a/2 = 1'],
+        ['外接球半径', `R = (√3/2)a ≈ ${Math.sqrt(3).toFixed(3)}`],
+        ['重要关系', 'R : r = √3 : 1'],
+      ]};
+    }
+  },
+
+  /* 4. 正四面体 */
+  {
+    id: 'tetra',
+    name: '4. 正四面体',
+    build: () => {
+      const g = new THREE.Group();
+      const a = 2.4;
+      const geo = makeTetra(a);
+      g.add(solid(geo));
+      g.add(edges(geo));
+      return { g, info: [
+        ['棱长', `a = ${a}`],
+        ['体积', `V = (√2/12)a³ ≈ ${(Math.SQRT2/12*a**3).toFixed(3)}`],
+        ['高', `h = (√6/3)a ≈ ${(Math.sqrt(6)/3*a).toFixed(3)}`],
+        ['表面积', `S = √3·a² ≈ ${(Math.sqrt(3)*a*a).toFixed(3)}`],
+      ]};
+    }
+  },
+
+  /* 5. 正四面体 + 内切球 + 外接球 */
+  {
+    id: 'tetra-both',
+    name: '5. 正四面体 + 内切球 + 外接球',
+    build: () => {
+      const g = new THREE.Group();
+      const a = 2.4;
+      const geo = makeTetra(a);
+      g.add(solid(geo, 0x66ccff, 0.32));
+      g.add(edges(geo));
+      g.add(sphereMesh(a*Math.sqrt(6)/12, 0x66ff88, 0.4));
+      g.add(sphereMesh(a*Math.sqrt(6)/4, 0xff8866, 0.09));
+      return { g, info: [
+        ['棱长', `a = ${a}`],
+        ['内切球半径', `r ≈ ${(a*Math.sqrt(6)/12).toFixed(3)}`],
+        ['外接球半径', `R ≈ ${(a*Math.sqrt(6)/4).toFixed(3)}`],
+        ['重要关系', 'R : r = 3 : 1'],
+      ]};
+    }
+  },
+
+  /* 6. 正八面体 + 外接球 */
+  {
+    id: 'octa-circ',
+    name: '6. 正八面体 + 外接球',
+    build: () => {
+      const g = new THREE.Group();
+      const R = 1.5;
+      const geo = new THREE.OctahedronGeometry(R);
+      g.add(solid(geo));
+      g.add(edges(geo));
+      g.add(sphereMesh(R, 0xff8866, 0.12));
+      return { g, info: [
+        ['外接球半径', `R = ${R}`],
+        ['棱长', `a = R√2 ≈ ${(R*Math.SQRT2).toFixed(3)}`],
+        ['体积', `V = (√2/3)a³ ≈ ${(Math.SQRT2/3*(R*Math.SQRT2)**3).toFixed(3)}`],
+        ['结构', '6 个顶点、8 个三角面'],
+      ]};
+    }
+  },
+
+  /* 7. 圆柱 */
+  {
+    id: 'cylinder',
+    name: '7. 圆柱',
+    build: () => {
+      const g = new THREE.Group();
+      const r = 1.2, h = 2.4;
+      const geo = new THREE.CylinderGeometry(r, r, h, 64);
+      g.add(solid(geo));
+      g.add(edges(geo));
+      return { g, info: [
+        ['半径', `r = ${r}`],
+        ['高', `h = ${h}`],
+        ['体积', `V = πr²h ≈ ${(Math.PI*r*r*h).toFixed(3)}`],
+        ['侧面积', `S侧 ≈ ${(2*Math.PI*r*h).toFixed(3)}`],
+        ['全面积', `S全 ≈ ${(2*Math.PI*r*(r+h)).toFixed(3)}`],
+      ]};
+    }
+  },
+
+  /* 8. 圆柱 + 内切球 */
+  {
+    id: 'cylinder-sphere',
+    name: '8. 圆柱 + 内切球',
+    build: () => {
+      const g = new THREE.Group();
+      const r = 1.2, h = 2 * r;
+      const geo = new THREE.CylinderGeometry(r, r, h, 64, 1, true);
+      g.add(solid(geo));
+      g.add(circleLine(r, h/2));
+      g.add(circleLine(r, -h/2));
+      g.add(sphereMesh(r, 0x66ff88, 0.42));
+      const Vc = Math.PI*r*r*h;
+      const Vs = 4/3*Math.PI*r**3;
+      return { g, info: [
+        ['圆柱半径', `r = ${r}`],
+        ['圆柱高', `h = 2r = ${h}`],
+        ['内切球半径', `r内 = ${r}`],
+        ['V柱', `${Vc.toFixed(3)}`],
+        ['V球', `${Vs.toFixed(3)}`],
+        ['V柱 : V球', '= 3 : 2'],
+      ]};
+    }
+  },
+
+  /* 9. 圆锥 */
+  {
+    id: 'cone',
+    name: '9. 圆锥',
+    build: () => {
+      const g = new THREE.Group();
+      const r = 1.3, h = 2.4;
+      const geo = new THREE.ConeGeometry(r, h, 64);
+      g.add(solid(geo));
+      g.add(edges(geo));
+      const l = Math.sqrt(r*r + h*h);
+      return { g, info: [
+        ['底面半径', `r = ${r}`],
+        ['高', `h = ${h}`],
+        ['母线', `l ≈ ${l.toFixed(3)}`],
+        ['体积', `V = (1/3)πr²h ≈ ${(Math.PI*r*r*h/3).toFixed(3)}`],
+        ['侧面积', `S侧 = πrl ≈ ${(Math.PI*r*l).toFixed(3)}`],
+      ]};
+    }
+  },
+
+  /* 10. 圆锥 + 内切球 */
+  {
+    id: 'cone-sphere',
+    name: '10. 圆锥 + 内切球',
+    build: () => {
+      const g = new THREE.Group();
+      const r = 1.3, h = 2.4;
+      const geo = new THREE.ConeGeometry(r, h, 64, 1, true);
+      g.add(solid(geo));
+      g.add(circleLine(r, -h/2));
+      const l = Math.sqrt(r*r + h*h);
+      const rs = r * h / (r + l);
+      const sphereGeo = new THREE.SphereGeometry(rs, 48, 32);
+      const sm = solid(sphereGeo, 0x66ff88, 0.55);
+      sm.position.y = -h/2 + rs;
+      g.add(sm);
+      return { g, info: [
+        ['底面半径', `r = ${r}`],
+        ['高', `h = ${h}`],
+        ['母线', `l ≈ ${l.toFixed(3)}`],
+        ['内切球半径', `r内 = rh/(r+l) ≈ ${rs.toFixed(3)}`],
+        ['球心高度', `底面上方 ${rs.toFixed(3)}`],
+      ]};
+    }
+  },
+
+  /* 11. 圆台 */
+  {
+    id: 'frustum',
+    name: '11. 圆台',
+    build: () => {
+      const g = new THREE.Group();
+      const r1 = 1.3, r2 = 0.7, h = 2.2;
+      const geo = new THREE.CylinderGeometry(r2, r1, h, 64);
+      g.add(solid(geo));
+      g.add(edges(geo));
+      const l = Math.sqrt((r1-r2)**2 + h*h);
+      const V = Math.PI*h/3*(r1*r1 + r1*r2 + r2*r2);
+      return { g, info: [
+        ['下底半径', `R = ${r1}`],
+        ['上底半径', `r = ${r2}`],
+        ['高', `h = ${h}`],
+        ['母线', `l ≈ ${l.toFixed(3)}`],
+        ['体积', `V ≈ ${V.toFixed(3)}`],
+        ['侧面积', `S侧 = π(R+r)l ≈ ${(Math.PI*(r1+r2)*l).toFixed(3)}`],
+      ]};
+    }
+  },
+
+  /* 12. 球 */
+  {
+    id: 'sphere',
+    name: '12. 球',
+    build: () => {
+      const g = new THREE.Group();
+      const r = 1.4;
+      g.add(solid(new THREE.SphereGeometry(r, 64, 48), 0x66ccff, 0.5));
+      const wire = new THREE.LineSegments(
+        new THREE.WireframeGeometry(new THREE.SphereGeometry(r, 24, 16)),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 })
+      );
+      g.add(wire);
+      return { g, info: [
+        ['半径', `R = ${r}`],
+        ['体积', `V = (4/3)πR³ ≈ ${(4/3*Math.PI*r**3).toFixed(3)}`],
+        ['表面积', `S = 4πR² ≈ ${(4*Math.PI*r*r).toFixed(3)}`],
+        ['性质', '任意平面截球都是圆'],
+      ]};
+    }
+  },
+
+  /* 13. 球 + 内接正方体 */
+  {
+    id: 'sphere-cube',
+    name: '13. 球 + 内接正方体',
+    build: () => {
+      const g = new THREE.Group();
+      const R = 1.6;
+      g.add(sphereMesh(R, 0xff8866, 0.16));
+      const a = 2 * R / Math.sqrt(3);
+      const boxGeo = new THREE.BoxGeometry(a, a, a);
+      g.add(solid(boxGeo));
+      g.add(edges(boxGeo));
+      return { g, info: [
+        ['球半径', `R = ${R}`],
+        ['正方体棱长', `a = 2R/√3 ≈ ${a.toFixed(3)}`],
+        ['体对角线', `= 2R = ${2*R}`],
+        ['关系', '正方体 8 个顶点都在球面上'],
+      ]};
+    }
+  },
+
+  /* 14. 正方体 + 半球（组合体） */
+  {
+    id: 'cube-hemi',
+    name: '14. 正方体 + 半球（组合体）',
+    build: () => {
+      const g = new THREE.Group();
+      const a = 1.8;
+      const boxGeo = new THREE.BoxGeometry(a, a, a);
+      const box = solid(boxGeo);
+      box.position.y = -a/2;
+      g.add(box);
+      const boxEdge = edges(boxGeo);
+      boxEdge.position.y = -a/2;
+      g.add(boxEdge);
+
+      const sphereGeo = new THREE.SphereGeometry(a/2, 48, 24, 0, Math.PI*2, 0, Math.PI/2);
+      const hemi = solid(sphereGeo, 0xffaa44, 0.5);
+      g.add(hemi);
+
+      const rim = circleLine(a/2, 0.001, 0xffcc66, 0.75);
+      g.add(rim);
+
+      const V = a**3 + 2/3*Math.PI*(a/2)**3;
+      return { g, info: [
+        ['正方体棱长', `a = ${a}`],
+        ['半球半径', `r = a/2 = ${a/2}`],
+        ['正方体体积', `V₁ = a³ ≈ ${(a**3).toFixed(3)}`],
+        ['半球体积', `V₂ = (2/3)πr³ ≈ ${(2/3*Math.PI*(a/2)**3).toFixed(3)}`],
+        ['总体积', `V ≈ ${V.toFixed(3)}`],
+      ]};
+    }
+  },
+
+  /* 15. 圆柱 + 圆锥（组合体） */
+  {
+    id: 'cyl-cone',
+    name: '15. 圆柱 + 圆锥（组合体）',
+    build: () => {
+      const g = new THREE.Group();
+      const r = 1.2, h1 = 1.6, h2 = 1.9;
+      const yBottom = -(h1 + h2) / 2;
+
+      const cylGeo = new THREE.CylinderGeometry(r, r, h1, 64, 1, true);
+      const cyl = solid(cylGeo);
+      cyl.position.y = yBottom + h1 / 2;
+      g.add(cyl);
+      g.add(circleLine(r, yBottom));
+      g.add(circleLine(r, yBottom + h1));
+
+      const coneGeo = new THREE.ConeGeometry(r, h2, 64, 1, true);
+      const cone = solid(coneGeo, 0xffaa44, 0.48);
+      cone.position.y = yBottom + h1 + h2 / 2;
+      g.add(cone);
+      g.add(circleLine(r, yBottom + h1, 0xffcc66));
+
+      const V = Math.PI*r*r*h1 + Math.PI*r*r*h2/3;
+      return { g, info: [
+        ['公共半径', `r = ${r}`],
+        ['圆柱高', `h₁ = ${h1}`],
+        ['圆锥高', `h₂ = ${h2}`],
+        ['圆柱体积', `V₁ ≈ ${(Math.PI*r*r*h1).toFixed(3)}`],
+        ['圆锥体积', `V₂ ≈ ${(Math.PI*r*r*h2/3).toFixed(3)}`],
+        ['总体积', `V ≈ ${V.toFixed(3)}`],
+      ]};
+    }
+  },
+
+];
+
+/* ============ 状态 ============ */
+let currentGroup = null;
+
+/* ============ 加载模型 ============ */
+const modelSelect = document.getElementById('modelSelect');
+const infoName = document.getElementById('modelName');
+const infoRows = document.getElementById('infoRows');
+
+MODELS.forEach(m => {
+  const opt = document.createElement('option');
+  opt.value = m.id;
+  opt.textContent = m.name;
+  modelSelect.appendChild(opt);
+});
+
+function loadModel(id) {
+  const model = MODELS.find(m => m.id === id);
+  if (!model) return;
+
+  if (currentGroup) {
+    scene.remove(currentGroup);
+    currentGroup.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+        else o.material.dispose();
+      }
+    });
+  }
+
+  const { g, info } = model.build();
+  currentGroup = g;
+  scene.add(g);
+
+  infoName.textContent = model.name;
+  infoRows.innerHTML = '';
+  info.forEach(([k, v]) => {
+    const row = document.createElement('div');
+    row.className = 'row-info';
+    const s1 = document.createElement('span');
+    s1.textContent = k;
+    const s2 = document.createElement('span');
+    s2.className = 'val';
+    s2.textContent = v;
+    row.appendChild(s1);
+    row.appendChild(s2);
+    infoRows.appendChild(row);
+  });
+
+  camera.position.set(4.5, 3.8, 5.5);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+modelSelect.addEventListener('change', () => loadModel(modelSelect.value));
+
+document.getElementById('btnReset').onclick = () => {
+  camera.position.set(4.5, 3.8, 5.5);
+  controls.target.set(0, 0, 0);
+  controls.update();
+};
+
+/* ============ 动画循环 ============ */
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ============ 初始化 ============ */
+loadModel('cube');
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

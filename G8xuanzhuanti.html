@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>G8 旋转体生成器</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: "Microsoft YaHei", sans-serif; background: #1a1a2e; color: white; }
+
+  #title {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    font-size: 19px; color: #66ccff;
+    background: rgba(0,0,0,0.72);
+    padding: 8px 24px; border-radius: 20px;
+    font-weight: bold; letter-spacing: 2px;
+  }
+
+  #info {
+    position: absolute; top: 80px; left: 20px;
+    background: rgba(0,0,0,0.78);
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 14px; line-height: 1.9; min-width: 270px;
+  }
+  #info h3 { margin: 0 0 8px; color: #66ccff; font-size: 15px; }
+  .row-info { display: flex; justify-content: space-between; gap: 16px; }
+  .val { color: #88ffbb; font-weight: bold; }
+  .big { color: #ffcc00; font-weight: bold; font-size: 16px; }
+  .shapeName { color: #ff8866; font-weight: bold; font-size: 16px; }
+
+  #hint {
+    position: absolute; top: 80px; right: 20px;
+    background: rgba(0,0,0,0.7); padding: 12px 18px; border-radius: 8px;
+    font-size: 13px; line-height: 1.8; max-width: 240px; color: #aaccff;
+  }
+  #hint strong { color: #ffcc00; }
+
+  #legend {
+    position: absolute; bottom: 210px; right: 20px;
+    background: rgba(0,0,0,0.72);
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; line-height: 1.85;
+  }
+  .dot { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+
+  #controls {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.9); padding: 16px 24px; border-radius: 12px;
+    display: flex; flex-direction: column; gap: 12px; min-width: 720px;
+  }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .row label { font-size: 14px; color: #ccc; white-space: nowrap; }
+  .row select {
+    padding: 6px 12px; background: #1a1a2e; color: #88ccff;
+    border: 1px solid #4488ff; border-radius: 6px;
+    font-size: 14px; font-weight: bold; font-family: inherit;
+  }
+  #angleSlider { flex: 1; min-width: 200px; height: 6px; cursor: pointer; }
+  #angleValue { color: #ffcc00; font-weight: bold; font-size: 16px; min-width: 70px; text-align: right; }
+
+  #btnRow button {
+    padding: 8px 16px; font-size: 13px;
+    border: none; border-radius: 6px; cursor: pointer;
+    background: #4488ff; color: white; font-weight: bold; font-family: inherit;
+  }
+  #btnRow button:hover { background: #3366cc; }
+  #btnAnimate { background: #22aa66 !important; }
+  #btnAnimate:hover { background: #118855 !important; }
+</style>
+</head>
+<body>
+
+<div id="title">G8 旋转体生成器</div>
+
+<div id="info">
+  <h3>数据面板</h3>
+  <div class="row-info"><span>平面图形</span><span class="shapeName" id="infoShape">矩形</span></div>
+  <div class="row-info"><span>旋转角</span><span class="big" id="infoAngle">0°</span></div>
+  <div class="row-info"><span>生成立体</span><span class="val" id="infoSolid">圆柱</span></div>
+  <div class="row-info"><span>当前体积</span><span class="val" id="infoVol">0.000</span></div>
+  <div class="row-info"><span>完整体积</span><span class="val" id="infoVolFull">0.000</span></div>
+</div>
+
+<div id="hint">
+  💡 <strong>玩法</strong><br>
+  1. 选平面图形<br>
+  2. 拖旋转角滑块 0°→360°<br>
+  3. 看平面扫出的立体<br>
+  4. 鼠标拖动旋转视角<br><br>
+  <strong>矩形 → 圆柱</strong><br>
+  <strong>直角三角形 → 圆锥</strong><br>
+  <strong>半圆 → 球</strong><br>
+  <strong>直角梯形 → 圆台</strong>
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#ffcc00"></span>旋转轴</div>
+  <div><span class="dot" style="background:#ff8866"></span>起始平面</div>
+  <div><span class="dot" style="background:#ffaa44"></span>当前位置平面</div>
+  <div><span class="dot" style="background:#66ccff"></span>旋转体</div>
+</div>
+
+<div id="controls">
+  <div class="row">
+    <label>平面图形</label>
+    <select id="shapeSelect">
+      <option value="rect">矩形</option>
+      <option value="triangle">直角三角形</option>
+      <option value="semicircle">半圆</option>
+      <option value="trapezoid">直角梯形</option>
+    </select>
+    <label>旋转角</label>
+    <input type="range" id="angleSlider" min="0" max="360" value="0" step="1">
+    <span id="angleValue">0°</span>
+  </div>
+  <div class="row" id="btnRow" style="justify-content:center;">
+    <button id="btn90">90°</button>
+    <button id="btn180">180°</button>
+    <button id="btn270">270°</button>
+    <button id="btn360">360°（完整）</button>
+    <button id="btnAnimate">自动演示</button>
+    <button id="btnReset">重置视角</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============ 参数 ============ */
+const R = 1.2;
+const H = 2.0;
+const R_TOP = 0.6;   // 圆台上底半径
+
+let shapeType = 'rect';
+let angleDeg = 0;
+let animating = false;
+let animStartTime = 0;
+
+/* ============ 场景 ============ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(4.5, 4, 6);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 1, 0);
+
+/* ============ 光照 ============ */
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const dl1 = new THREE.DirectionalLight(0xffffff, 1.1);
+dl1.position.set(5, 10, 7); scene.add(dl1);
+const dl2 = new THREE.DirectionalLight(0x88aaff, 0.6);
+dl2.position.set(-5, 4, -7); scene.add(dl2);
+const dl3 = new THREE.DirectionalLight(0xffffff, 0.5);
+dl3.position.set(0, -5, 0); scene.add(dl3);
+
+/* ============ 地面网格 ============ */
+const grid = new THREE.GridHelper(12, 24, 0x444466, 0x2a2a44);
+grid.position.y = -0.02;
+scene.add(grid);
+
+/* ============ 旋转轴（黄色虚线） ============ */
+const axisGeo = new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(0, -0.3, 0),
+  new THREE.Vector3(0, H + 0.5, 0),
+]);
+const axisLine = new THREE.Line(axisGeo, new THREE.LineDashedMaterial({
+  color: 0xffcc00, dashSize: 0.13, gapSize: 0.09, linewidth: 2,
+}));
+axisLine.computeLineDistances();
+scene.add(axisLine);
+
+/* ============ 轮廓函数 ============ */
+function getProfile() {
+  switch (shapeType) {
+    case 'rect':
+      return [
+        new THREE.Vector2(0, 0),
+        new THREE.Vector2(R, 0),
+        new THREE.Vector2(R, H),
+        new THREE.Vector2(0, H),
+      ];
+    case 'triangle':
+      return [
+        new THREE.Vector2(0, 0),
+        new THREE.Vector2(R, 0),
+        new THREE.Vector2(0, H),
+      ];
+    case 'semicircle': {
+      const pts = [new THREE.Vector2(0, 0)];
+      const N = 48;
+      for (let i = 1; i < N; i++) {
+        const t = (i / N) * Math.PI;
+        pts.push(new THREE.Vector2(R * Math.sin(t), R - R * Math.cos(t)));
+      }
+      pts.push(new THREE.Vector2(0, 2 * R));
+      return pts;
+    }
+    case 'trapezoid':
+      return [
+        new THREE.Vector2(0, 0),
+        new THREE.Vector2(R, 0),
+        new THREE.Vector2(R_TOP, H),
+        new THREE.Vector2(0, H),
+      ];
+  }
+}
+
+/* ============ 名称与体积 ============ */
+function getSolidName() {
+  return { rect: '圆柱', triangle: '圆锥', semicircle: '球', trapezoid: '圆台' }[shapeType];
+}
+function getFullVolume() {
+  if (shapeType === 'rect')       return Math.PI * R * R * H;
+  if (shapeType === 'triangle')   return Math.PI * R * R * H / 3;
+  if (shapeType === 'semicircle') return 4 / 3 * Math.PI * R * R * R;
+  if (shapeType === 'trapezoid')  return Math.PI * H / 3 * (R * R + R * R_TOP + R_TOP * R_TOP);
+  return 0;
+}
+
+/* ============ 旋转体 mesh ============ */
+const latheMat = new THREE.MeshStandardMaterial({
+  color: 0x66ccff, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.45,
+  roughness: 0.45, metalness: 0.12,
+  emissive: 0x113355, emissiveIntensity: 0.28,
+  depthWrite: false,
+});
+const latheMesh = new THREE.Mesh(new THREE.BufferGeometry(), latheMat);
+latheMesh.frustumCulled = false;
+scene.add(latheMesh);
+
+/* ============ 起始位置的平面图形 ============ */
+const staticShapeMat = new THREE.MeshBasicMaterial({
+  color: 0xff8866, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.55,
+  depthWrite: false,
+});
+const staticShapeMesh = new THREE.Mesh(new THREE.BufferGeometry(), staticShapeMat);
+staticShapeMesh.rotation.y = -Math.PI / 2;  /* local x 轴指向 +z */
+staticShapeMesh.frustumCulled = false;
+scene.add(staticShapeMesh);
+
+const staticLine = new THREE.Line(new THREE.BufferGeometry(),
+  new THREE.LineBasicMaterial({ color: 0xffaa77, linewidth: 2 }));
+staticLine.rotation.y = -Math.PI / 2;
+staticLine.frustumCulled = false;
+scene.add(staticLine);
+
+/* ============ 当前位置的平面图形 ============ */
+const movingGroup = new THREE.Group();
+scene.add(movingGroup);
+
+const movingShapeMat = new THREE.MeshBasicMaterial({
+  color: 0xffaa44, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.6,
+  depthWrite: false,
+});
+const movingShapeMesh = new THREE.Mesh(new THREE.BufferGeometry(), movingShapeMat);
+movingShapeMesh.rotation.y = -Math.PI / 2;
+movingGroup.add(movingShapeMesh);
+
+const movingLine = new THREE.Line(new THREE.BufferGeometry(),
+  new THREE.LineBasicMaterial({ color: 0xffddaa, linewidth: 2 }));
+movingLine.rotation.y = -Math.PI / 2;
+movingGroup.add(movingLine);
+
+/* ============ 构建平面图形几何体 ============ */
+function buildShapeGeometry() {
+  const profile = getProfile();
+
+  /* 填充面 */
+  const shape = new THREE.Shape();
+  shape.moveTo(profile[0].x, profile[0].y);
+  for (let i = 1; i < profile.length; i++) {
+    shape.lineTo(profile[i].x, profile[i].y);
+  }
+  shape.closePath();
+  const shapeGeo = new THREE.ShapeGeometry(shape);
+
+  staticShapeMesh.geometry.dispose();
+  staticShapeMesh.geometry = shapeGeo;
+  movingShapeMesh.geometry.dispose();
+  movingShapeMesh.geometry = shapeGeo.clone();
+
+  /* 轮廓线 */
+  const linePts = profile.map(p => new THREE.Vector3(p.x, p.y, 0));
+  linePts.push(new THREE.Vector3(profile[0].x, profile[0].y, 0));
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+  staticLine.geometry.dispose();
+  staticLine.geometry = lineGeo;
+  movingLine.geometry.dispose();
+  movingLine.geometry = lineGeo.clone();
+}
+
+/* ============ 更新旋转体 ============ */
+function updateLathe() {
+  const profile = getProfile();
+  const angleRad = angleDeg * Math.PI / 180;
+
+  /* LatheGeometry 从 +Z 绕到 +X，对应 rotation.y 从 -π/2 增加 angleRad */
+  const latheGeo = new THREE.LatheGeometry(profile, 128, 0, angleRad);
+  latheMesh.geometry.dispose();
+  latheMesh.geometry = latheGeo;
+  latheMesh.visible = angleDeg > 0.5;
+
+  /* 移动平面图形的位置 */
+  movingGroup.rotation.y = angleRad;
+
+  /* 数据面板 */
+  const volFull = getFullVolume();
+  const volNow = volFull * (angleDeg / 360);
+  document.getElementById('infoShape').textContent =
+    { rect: '矩形', triangle: '直角三角形', semicircle: '半圆', trapezoid: '直角梯形' }[shapeType];
+  document.getElementById('infoAngle').textContent = angleDeg.toFixed(0) + '°';
+  document.getElementById('infoSolid').textContent = getSolidName();
+  document.getElementById('infoVol').textContent = volNow.toFixed(4);
+  document.getElementById('infoVolFull').textContent = volFull.toFixed(4);
+  document.getElementById('angleValue').textContent = angleDeg.toFixed(0) + '°';
+}
+
+/* ============ 重建全部 ============ */
+function rebuildAll() {
+  buildShapeGeometry();
+  updateLathe();
+}
+
+/* ============ UI 事件 ============ */
+const shapeSelect = document.getElementById('shapeSelect');
+const angleSlider = document.getElementById('angleSlider');
+
+shapeSelect.addEventListener('change', () => {
+  shapeType = shapeSelect.value;
+  angleDeg = 0;
+  angleSlider.value = 0;
+  animating = false;
+  document.getElementById('btnAnimate').textContent = '自动演示';
+  rebuildAll();
+});
+
+angleSlider.addEventListener('input', () => {
+  angleDeg = parseFloat(angleSlider.value);
+  animating = false;
+  document.getElementById('btnAnimate').textContent = '自动演示';
+  updateLathe();
+});
+
+document.getElementById('btn90').onclick  = () => { angleDeg = 90;  angleSlider.value = 90;  animating = false; updateLathe(); };
+document.getElementById('btn180').onclick = () => { angleDeg = 180; angleSlider.value = 180; animating = false; updateLathe(); };
+document.getElementById('btn270').onclick = () => { angleDeg = 270; angleSlider.value = 270; animating = false; updateLathe(); };
+document.getElementById('btn360').onclick = () => { angleDeg = 360; angleSlider.value = 360; animating = false; updateLathe(); };
+
+document.getElementById('btnAnimate').onclick = () => {
+  if (animating) {
+    animating = false;
+    document.getElementById('btnAnimate').textContent = '自动演示';
+  } else {
+    animating = true;
+    angleDeg = 0;
+    angleSlider.value = 0;
+    animStartTime = performance.now();
+    document.getElementById('btnAnimate').textContent = '暂停';
+  }
+};
+
+document.getElementById('btnReset').onclick = () => {
+  camera.position.set(4.5, 4, 6);
+  controls.target.set(0, 1, 0);
+  controls.update();
+};
+
+/* ============ 动画循环 ============ */
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (animating) {
+    const elapsed = (performance.now() - animStartTime) / 1000;
+    /* 4 秒转满一圈 */
+    angleDeg = Math.min(360, elapsed * 90);
+    angleSlider.value = angleDeg;
+    updateLathe();
+    if (angleDeg >= 360) {
+      animating = false;
+      document.getElementById('btnAnimate').textContent = '自动演示';
+    }
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ============ 初始化 ============ */
+rebuildAll();
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
